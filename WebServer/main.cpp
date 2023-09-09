@@ -5,6 +5,8 @@
 #include <mutex>
 #include <sstream>
 
+#include "spdlog/spdlog.h" 
+
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <WinSock2.h>
@@ -26,14 +28,14 @@ struct Client
     SOCKET socket;
     std::thread thread;
     std::string ipAddress;
-    std::string port;
+    int port;
 
     void disconnect()
     {
         shutdown(socket, SD_SEND);
         closesocket(socket);
 
-        std::cout << "Disconnected: " << ipAddress << ':' << port;
+        SPDLOG_INFO("Disconnected: {}:{}", ipAddress, port);
     }
 };
 
@@ -81,7 +83,7 @@ public:
 
         char serverIPAddress[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &(serverAddress.sin_addr), serverIPAddress, INET_ADDRSTRLEN);
-        std::cout << "Created server on: " << serverIPAddress << ':' << ntohs(serverAddress.sin_port) << '\n';
+        SPDLOG_INFO("Created server on: {}:{}", serverIPAddress, ntohs(serverAddress.sin_port));
     }
 
     void run()
@@ -102,10 +104,12 @@ public:
 
             char clientIPAddress[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &(clientAddress.sin_addr), clientIPAddress, INET_ADDRSTRLEN);
+            int clientPort = ntohs(clientAddress.sin_port);
 
-            std::cout << "Connected: " << clientIPAddress << ':' << ntohs(clientAddress.sin_port) << '\n';
+            SPDLOG_INFO("Connected: {}:{}", clientIPAddress, clientPort);
 
-            m_clients.push_back(Client{ clientSocket, std::thread{ &Server::clientProc, this, clientSocket } });
+            m_clients.push_back(Client{ clientSocket,
+                std::thread{ &Server::clientProc, this, clientSocket }, clientIPAddress, clientPort });
         }
     }
 
@@ -162,6 +166,8 @@ private:
 
 int main()
 {
+    spdlog::set_level(spdlog::level::info);
+
     Server webServer;
     webServer.run();
 
